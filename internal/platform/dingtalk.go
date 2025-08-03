@@ -184,10 +184,9 @@ func (d *DingtalkPlatform) sendHTTPRequest(webhook config.WebhookConfig, payload
 
 // generateSign 生成钉钉签名
 func (d *DingtalkPlatform) generateSign(timestamp int64, secret string) string {
-	stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
 	h := hmac.New(sha256.New, []byte(secret))
-	h.Write([]byte(stringToSign))
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+	h.Write([]byte(fmt.Sprintf("%v\n%s", timestamp, secret)))
+	return url.QueryEscape(base64.StdEncoding.EncodeToString(h.Sum(nil)))
 }
 
 // GetName 获取平台名称

@@ -12,6 +12,7 @@ type Config struct {
 	Recipients map[string]RecipientConfig `mapstructure:"recipients"`
 	Queue      QueueConfig                `mapstructure:"queue"`
 	Task       TaskConfig                 `mapstructure:"task"`
+	Email      EmailConfig                `mapstructure:"email"`
 }
 
 // ServerConfig 服务器配置
@@ -40,8 +41,9 @@ type RecipientConfig struct {
 
 // PlatformConfig 推送平台配置
 type PlatformConfig struct {
-	Enabled  bool            `mapstructure:"enabled"`
-	Webhooks []WebhookConfig `mapstructure:"webhooks"`
+	Enabled    bool                   `mapstructure:"enabled"`
+	Webhooks   []WebhookConfig        `mapstructure:"webhooks"`
+	Recipients []EmailRecipientConfig `mapstructure:"recipients"`
 }
 
 // WebhookConfig Webhook配置
@@ -49,6 +51,12 @@ type WebhookConfig struct {
 	URL    string `mapstructure:"url"`
 	Secret string `mapstructure:"secret"`
 	Name   string `mapstructure:"name"`
+}
+
+// EmailRecipientConfig 邮件收件人配置
+type EmailRecipientConfig struct {
+	Email string `mapstructure:"email"`
+	Name  string `mapstructure:"name"`
 }
 
 // QueueConfig 队列配置
@@ -64,6 +72,15 @@ type QueueConfig struct {
 type TaskConfig struct {
 	CleanupInterval int `mapstructure:"cleanup_interval"` // 清理间隔(秒)
 	MaxAge          int `mapstructure:"max_age"`          // 任务最大保存时间(秒)
+}
+
+// EmailConfig 邮件配置
+type EmailConfig struct {
+	SMTPHost string `mapstructure:"smtp_host"` // SMTP服务器地址
+	SMTPPort int    `mapstructure:"smtp_port"` // SMTP端口
+	Username string `mapstructure:"username"`  // SMTP用户名
+	Password string `mapstructure:"password"`  // SMTP密码
+	From     string `mapstructure:"from"`      // 发件人邮箱
 }
 
 var AppConfig *Config

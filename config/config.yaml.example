@@ -1,0 +1,117 @@
+# PushServer 配置文件示例
+# 复制此文件为 config.yaml 并修改相应配置
+
+# 服务配置
+server:
+  port: 8080                    # 服务端口
+  host: "0.0.0.0"              # 监听地址
+  mode: "debug"                # 运行模式: debug, release, test
+
+# 日志配置
+log:
+  level: "info"                # 日志级别: debug, info, warn, error
+  format: "json"               # 日志格式: json, text
+  output: "file"               # 输出方式: stdout, file, both
+  file_path: "log/app.log"     # 日志文件路径
+
+# 队列配置
+queue:
+  worker_count: 50             # 工作协程数量
+  buffer_size: 10000           # 队列缓冲区大小
+  timeout: 10                  # 推送超时时间(秒)
+
+# 任务管理配置
+task:
+  cleanup_interval: 300        # 清理间隔(秒)
+  retention_time: 3600         # 任务保留时间(秒)
+
+# 接收者配置
+recipients:
+  # 运维告警组
+  ops_alert:
+    name: "运维告警组"
+    platforms:
+      # 飞书配置
+      feishu:
+        enabled: true
+        webhooks:
+          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+            secret: "your-webhook-secret"
+            name: "主要告警群"
+          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/your-backup-webhook-token"
+            secret: "your-backup-webhook-secret"
+            name: "备用告警群"
+      
+      # 钉钉配置
+      dingtalk:
+        enabled: false
+        webhooks:
+          - url: "https://oapi.dingtalk.com/robot/send?access_token=your-access-token"
+            secret: "your-webhook-secret"
+            name: "钉钉告警群"
+      
+      # 企业微信配置
+      wechat:
+        enabled: false
+        webhooks:
+          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your-webhook-key"
+            secret: ""
+            name: "企业微信告警群"
+
+  # 开发团队通知
+  dev_team:
+    name: "开发团队"
+    platforms:
+      feishu:
+        enabled: true
+        webhooks:
+          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/dev-team-webhook"
+            secret: "dev-team-secret"
+            name: "开发团队群"
+      
+      dingtalk:
+        enabled: true
+        webhooks:
+          - url: "https://oapi.dingtalk.com/robot/send?access_token=dev-team-token"
+            secret: "dev-team-dingtalk-secret"
+            name: "开发钉钉群"
+
+  # 产品团队通知
+  product_team:
+    name: "产品团队"
+    platforms:
+      wechat:
+        enabled: true
+        webhooks:
+          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=product-team-key"
+            secret: ""
+            name: "产品团队群"
+
+# 平台全局配置（可选）
+platforms:
+  feishu:
+    enabled: true
+    timeout: 10
+    max_retries: 3
+  
+  dingtalk:
+    enabled: true
+    timeout: 10
+    max_retries: 3
+  
+  wechat:
+    enabled: true
+    timeout: 10
+    max_retries: 3
+
+# 数据库配置（预留，当前未使用）
+database:
+  enabled: false
+  driver: "mysql"
+  host: "localhost"
+  port: 3306
+  username: ""
+  password: ""
+  database: ""
+  max_open_conns: 100
+  max_idle_conns: 10

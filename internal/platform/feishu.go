@@ -2,6 +2,9 @@ package platform
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,9 +31,9 @@ func (f *FeishuPlatform) Send(webhook config.WebhookConfig, req model.PushReques
 
 	// 根据样式选择消息格式
 	if req.Style == model.StyleCard {
-		payload = f.buildCardMessage(req)
+		payload = f.buildCardMessage(req, webhook)
 	} else {
-		payload = f.buildTextMessage(req)
+		payload = f.buildTextMessage(req, webhook)
 	}
 
 	// 发送HTTP请求
@@ -46,7 +49,7 @@ func (f *FeishuPlatform) Send(webhook config.WebhookConfig, req model.PushReques
 }
 
 // buildTextMessage 构建文本消息
-func (f *FeishuPlatform) buildTextMessage(req model.PushRequest) map[string]interface{} {
+func (f *FeishuPlatform) buildTextMessage(req model.PushRequest, webhook config.WebhookConfig) map[string]interface{} {
 	// 根据消息类型添加图标
 	var icon string
 	switch req.Type {
@@ -60,18 +63,28 @@ func (f *FeishuPlatform) buildTextMessage(req model.PushRequest) map[string]inte
 		icon = "ℹ️"
 	}
 
-	text := fmt.Sprintf("%s %s\n%s", icon, req.Content.Title, req.Content.Msg)
+	text := fmt.Sprintf("%s %s\n\n%s", icon, req.Content.Title, req.Content.Msg)
 
-	return map[string]interface{}{
+	message := map[string]interface{}{
 		"msg_type": "text",
 		"content": map[string]interface{}{
 			"text": text,
 		},
 	}
+
+	// 如果配置了签名，添加时间戳和签名
+	if webhook.Secret != "" {
+		timestamp := time.Now().Unix()
+		sign := f.generateSign(timestamp, webhook.Secret)
+		message["timestamp"] = fmt.Sprintf("%d", timestamp)
+		message["sign"] = sign
+	}
+
+	return message
 }
 
 // buildCardMessage 构建卡片消息
-func (f *FeishuPlatform) buildCardMessage(req model.PushRequest) map[string]interface{} {
+func (f *FeishuPlatform) buildCardMessage(req model.PushRequest, webhook config.WebhookConfig) map[string]interface{} {
 	// 根据消息类型设置颜色
 	var color string
 	var icon string
@@ -129,10 +142,20 @@ func (f *FeishuPlatform) buildCardMessage(req model.PushRequest) map[string]inte
 		},
 	}
 
-	return map[string]interface{}{
+	message := map[string]interface{}{
 		"msg_type": "interactive",
 		"card":     card,
 	}
+
+	// 如果配置了签名，添加时间戳和签名
+	if webhook.Secret != "" {
+		timestamp := time.Now().Unix()
+		sign := f.generateSign(timestamp, webhook.Secret)
+		message["timestamp"] = fmt.Sprintf("%d", timestamp)
+		message["sign"] = sign
+	}
+
+	return message
 }
 
 // sendHTTPRequest 发送HTTP请求
@@ -161,12 +184,6 @@ func (f *FeishuPlatform) sendHTTPRequest(webhook config.WebhookConfig, payload i
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// 如果有签名，添加签名头
-	if webhook.Secret != "" {
-		// 这里可以添加飞书的签名验证逻辑
-		// req.Header.Set("X-Lark-Signature", signature)
-	}
-
 	// 发送请求
 	client := &http.Client{
 		Timeout: time.Duration(config.AppConfig.Queue.Timeout) * time.Second,
@@ -190,6 +207,23 @@ func (f *FeishuPlatform) sendHTTPRequest(webhook config.WebhookConfig, payload i
 	}
 
 	return result
+}
+
+// generateSign 生成飞书签名
+func (f *FeishuPlatform) generateSign(timestamp int64, secret string) string {
+	// 飞书签名算法：timestamp + "\n" + secret
+	stringToSign := fmt.Sprintf("%d", timestamp) + "\n" + secret
+
+	// 使用HMAC-SHA256算法生成签名
+	h := hmac.New(sha256.New, []byte(stringToSign))
+	h.Write([]byte(""))
+
+	// Base64编码
+	signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
+	logger.Debugf("飞书签名生成 - 时间戳: %d, 签名字符串: %s, 签名: %s", timestamp, stringToSign, signature)
+
+	return signature
 }
 
 // GetName 获取平台名称

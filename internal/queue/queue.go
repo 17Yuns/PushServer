@@ -14,8 +14,8 @@ import (
 
 // PushJob 推送任务
 type PushJob struct {
-	TaskID  string             `json:"task_id"`
-	Request model.PushRequest  `json:"request"`
+	TaskID  string            `json:"task_id"`
+	Request model.PushRequest `json:"request"`
 }
 
 // Queue 队列结构
@@ -33,7 +33,7 @@ var PushQueue *Queue
 // InitQueue 初始化队列
 func InitQueue() {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	PushQueue = &Queue{
 		jobs:        make(chan PushJob, config.AppConfig.Queue.BufferSize),
 		workers:     config.AppConfig.Queue.WorkerCount,
@@ -48,7 +48,7 @@ func InitQueue() {
 		go PushQueue.worker(i)
 	}
 
-	logger.Infof("队列系统初始化完成，工作协程数: %d，缓冲区大小: %d", 
+	logger.Infof("队列系统初始化完成，工作协程数: %d，缓冲区大小: %d",
 		PushQueue.workers, config.AppConfig.Queue.BufferSize)
 }
 
@@ -69,9 +69,9 @@ func (q *Queue) AddJob(job PushJob) error {
 // worker 工作协程
 func (q *Queue) worker(id int) {
 	defer q.wg.Done()
-	
+
 	logger.Infof("工作协程 %d 启动", id)
-	
+
 	for {
 		select {
 		case job := <-q.jobs:
@@ -97,7 +97,7 @@ func (q *Queue) processJob(job PushJob) {
 	totalPushes := q.calculateTotalPushes(recipient, job.Request)
 	task.Manager.SetTaskTotal(job.TaskID, totalPushes)
 
-	logger.Infof("开始处理推送任务: %s, 接收者: %s, 总推送数: %d", 
+	logger.Infof("开始处理推送任务: %s, 接收者: %s, 总推送数: %d",
 		job.TaskID, recipient.Name, totalPushes)
 
 	// 使用推送服务执行策略
@@ -107,15 +107,22 @@ func (q *Queue) processJob(job PushJob) {
 // calculateTotalPushes 计算总推送数
 func (q *Queue) calculateTotalPushes(recipient config.RecipientConfig, req model.PushRequest) int {
 	total := 0
-	
+
 	// 如果指定了平台，只计算该平台
 	if req.Platform != "" {
 		if platform, exists := recipient.Platforms[req.Platform]; exists && platform.Enabled {
+			var webhookCount int
+			if req.Platform == "email" {
+				webhookCount = len(platform.Recipients)
+			} else {
+				webhookCount = len(platform.Webhooks)
+			}
+
 			switch req.Strategy {
 			case model.StrategyAll, model.StrategyMixed:
-				total = len(platform.Webhooks)
-			case model.StrategyFailover, model.StrategyWebhookAll, model.StrategyWebhookFailover:
-				if len(platform.Webhooks) > 0 {
+				total = webhookCount
+			case model.StrategyFailover, model.StrategyWebhookFailover:
+				if webhookCount > 0 {
 					total = 1
 				}
 			}
@@ -124,30 +131,35 @@ func (q *Queue) calculateTotalPushes(recipient config.RecipientConfig, req model
 	}
 
 	// 计算所有启用平台的推送数
-	for _, platform := range recipient.Platforms {
+	for platformName, platform := range recipient.Platforms {
 		if platform.Enabled {
+			var webhookCount int
+			if platformName == "email" {
+				webhookCount = len(platform.Recipients)
+			} else {
+				webhookCount = len(platform.Webhooks)
+			}
+
 			switch req.Strategy {
 			case model.StrategyAll:
-				total += len(platform.Webhooks)
+				total += webhookCount
 			case model.StrategyFailover:
-				if len(platform.Webhooks) > 0 {
+				if webhookCount > 0 {
 					total = 1 // 故障转移只需要一个成功
 					break
 				}
-			case model.StrategyWebhookAll, model.StrategyMixed:
-				total += len(platform.Webhooks)
+			case model.StrategyMixed:
+				total += webhookCount
 			case model.StrategyWebhookFailover:
-				if len(platform.Webhooks) > 0 {
+				if webhookCount > 0 {
 					total++
 				}
 			}
 		}
 	}
-	
+
 	return total
 }
-
-
 
 // Stop 停止队列
 func (q *Queue) Stop() {
@@ -157,7 +169,6 @@ func (q *Queue) Stop() {
 	q.wg.Wait()
 	logger.Info("队列系统已停止")
 }
-
 
 // 错误定义
 var (
