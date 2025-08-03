@@ -1,0 +1,66 @@
+# 服务配置
+server:
+  port: 8080
+  host: "0.0.0.0"
+  mode: "debug" # debug, release, test
+
+# 日志配置
+log:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "file" # stdout, file
+  file_path: "log/app.log"
+  error_file_path: "log/error.log"
+  info_file_path: "log/info.log"
+  debug_file_path: "log/debug.log"
+
+# 推送配置
+recipients:
+  ops_alert:
+    name: "运维告警组"
+    platforms:
+      feishu:
+        enabled: true
+        webhooks:
+          - url: ""
+            secret: ""
+            name: "主要告警群"
+          - url: ""
+            secret: ""
+            name: "备用告警群"
+      dingtalk:
+        enabled: false
+        webhooks:
+          - url: ""
+            secret: ""
+            name: "钉钉告警群"
+      wechat:
+        enabled: false
+        webhooks:
+          - url: ""
+            secret: ""
+            name: "企业微信告警群"
+  
+  dev_notify:
+    name: "开发通知组"
+    platforms:
+      feishu:
+        enabled: true
+        webhooks:
+          - url: ""
+            secret: ""
+            name: "开发群"
+
+# 队列配置
+queue:
+  worker_count: 50 # 工作协程数量
+  buffer_size: 10000 # 队列缓冲区大小
+  timeout: 10 # 推送超时时间(秒)
+  max_concurrent_per_platform: 20 # 每个平台最大并发数
+  batch_size: 100 # 批处理大小
+
+# 任务状态配置
+task:
+  cleanup_interval: 300 # 清理间隔(秒)，默认5分钟
+  max_age: 3600 # 任务最大保存时间(秒)，默认1小时
+
