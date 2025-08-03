@@ -1,6 +1,7 @@
 package pusher
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -82,6 +83,24 @@ func (ps *PushService) executePlatformOnlyStrategy(taskID string, req model.Push
 				return
 			}
 		}
+	} else if req.Platform == "system" {
+		// 系统通知平台使用notifications配置
+		for _, notification := range platformConfig.Notifications {
+			webhook := config.WebhookConfig{
+				URL:    notification.Type,
+				Secret: "",
+				Name:   notification.Name,
+			}
+			result := ps.sendToWebhook(req.Platform, webhook, req)
+			task.Manager.AddResult(taskID, result)
+			logger.Infof("指定平台推送结果: %s-%s: %s", req.Platform, notification.Name, result.Status)
+
+			// 只要有一个成功就停止
+			if result.Status == "success" {
+				logger.Infof("指定平台 %s 推送成功，任务完成，任务ID: %s", req.Platform, taskID)
+				return
+			}
+		}
 	} else {
 		// 其他平台使用webhooks配置
 		for _, webhook := range platformConfig.Webhooks {
@@ -98,6 +117,9 @@ func (ps *PushService) executePlatformOnlyStrategy(taskID string, req model.Push
 	}
 
 	logger.Warnf("指定平台 %s 所有地址都推送失败，任务ID: %s", req.Platform, taskID)
+
+	// 触发系统通知作为最后防线
+	ps.triggerSystemNotification(taskID, req, fmt.Sprintf("指定平台 %s 推送失败", req.Platform))
 }
 
 // executeAllStrategy 执行all策略：所有渠道都发送
@@ -134,6 +156,25 @@ func (ps *PushService) executeAllStrategy(taskID string, req model.PushRequest, 
 					logger.Infof("all策略推送结果: %s-%s: %s", pName, rec.Name, result.Status)
 				}(platformName, recipient)
 			}
+		} else if platformName == "system" {
+			// 系统通知平台使用notifications配置
+			for _, notification := range platformConfig.Notifications {
+				wg.Add(1)
+				go func(pName string, notif config.SystemNotificationConfig) {
+					defer wg.Done()
+					semaphore <- struct{}{}        // 获取信号量
+					defer func() { <-semaphore }() // 释放信号量
+
+					webhook := config.WebhookConfig{
+						URL:    notif.Type,
+						Secret: "",
+						Name:   notif.Name,
+					}
+					result := ps.sendToWebhook(pName, webhook, req)
+					task.Manager.AddResult(taskID, result)
+					logger.Infof("all策略推送结果: %s-%s: %s", pName, notif.Name, result.Status)
+				}(platformName, notification)
+			}
 		} else {
 			// 其他平台使用webhooks配置
 			for _, webhook := range platformConfig.Webhooks {
@@ -153,6 +194,9 @@ func (ps *PushService) executeAllStrategy(taskID string, req model.PushRequest, 
 
 	wg.Wait()
 	logger.Infof("all策略执行完成，任务ID: %s", taskID)
+
+	// 检查是否有成功的推送，如果全部失败则触发系统通知
+	ps.checkAndTriggerSystemNotification(taskID, req, "all策略所有渠道推送失败")
 }
 
 // executeFailoverStrategy 执行failover策略：渠道间故障转移
@@ -203,6 +247,9 @@ func (ps *PushService) executeFailoverStrategy(taskID string, req model.PushRequ
 	}
 
 	logger.Infof("failover策略执行完成，任务ID: %s", taskID)
+
+	// 检查是否有成功的推送，如果全部失败则触发系统通知
+	ps.checkAndTriggerSystemNotification(taskID, req, "failover策略所有渠道推送失败")
 }
 
 // executeWebhookFailoverStrategy 执行webhook_failover策略：每个渠道内webhook故障转移
@@ -258,6 +305,9 @@ func (ps *PushService) executeWebhookFailoverStrategy(taskID string, req model.P
 	}
 
 	logger.Infof("webhook_failover策略执行完成，任务ID: %s", taskID)
+
+	// 检查是否有成功的推送，如果全部失败则触发系统通知
+	ps.checkAndTriggerSystemNotification(taskID, req, "webhook_failover策略所有渠道推送失败")
 }
 
 // executeMixedStrategy 执行mixed策略：渠道间故障转移，渠道内webhook全发送
@@ -358,6 +408,9 @@ func (ps *PushService) executeMixedStrategy(taskID string, req model.PushRequest
 	}
 
 	logger.Infof("mixed策略执行完成，任务ID: %s", taskID)
+
+	// 检查是否有成功的推送，如果全部失败则触发系统通知
+	ps.checkAndTriggerSystemNotification(taskID, req, "mixed策略所有渠道推送失败")
 }
 
 // sendToWebhook 发送到webhook
@@ -375,6 +428,8 @@ func (ps *PushService) sendToWebhook(platformName string, webhook config.Webhook
 		result = ps.platformManager.ForwardToWechat(webhook, req)
 	case "email":
 		result = ps.platformManager.ForwardToEmail(webhook, req)
+	case "system":
+		result = ps.platformManager.ForwardToSystem(webhook, req)
 	default:
 		result = platform.PlatformResult{
 			Platform:  platformName,
@@ -395,4 +450,86 @@ func (ps *PushService) sendToWebhook(platformName string, webhook config.Webhook
 	}
 
 	return taskResult
+}
+
+// checkAndTriggerSystemNotification 检查推送结果并触发系统通知
+func (ps *PushService) checkAndTriggerSystemNotification(taskID string, req model.PushRequest, reason string) {
+	// 获取任务结果
+	taskInfo, exists := task.Manager.GetTask(taskID)
+	if !exists || taskInfo == nil {
+		logger.Warnf("无法获取任务信息，跳过系统通知检查，任务ID: %s", taskID)
+		return
+	}
+
+	// 检查是否有成功的推送
+	hasSuccess := false
+	for _, result := range taskInfo.Results {
+		if result.Status == "success" {
+			hasSuccess = true
+			break
+		}
+	}
+
+	// 如果没有成功的推送，触发系统通知
+	if !hasSuccess {
+		logger.Warnf("所有推送都失败，触发系统通知: %s", reason)
+		ps.triggerSystemNotification(taskID, req, reason)
+	}
+}
+
+// triggerSystemNotification 触发系统通知
+func (ps *PushService) triggerSystemNotification(taskID string, req model.PushRequest, reason string) {
+	logger.Infof("触发系统通知作为最后防线，任务ID: %s, 原因: %s", taskID, reason)
+
+	// 检查是否启用了系统通知
+	if !config.AppConfig.System.Enabled {
+		logger.Infof("系统通知未启用，跳过系统通知")
+		return
+	}
+
+	// 构建系统通知内容
+	systemReq := model.PushRequest{
+		Type:     model.TypeError, // 系统通知默认为错误类型
+		Style:    model.StyleText,
+		Strategy: "system",
+		Platform: "system",
+		Content: model.MessageContent{
+			Title: fmt.Sprintf("🚨 推送系统故障通知 - %s", reason),
+			Msg: fmt.Sprintf(`原始消息推送失败，触发系统通知：
+
+原始标题: %s
+原始内容: %s
+失败原因: %s
+任务ID: %s
+失败时间: %s
+
+请检查推送服务配置和网络连接状态。`,
+				req.Content.Title,
+				req.Content.Msg,
+				reason,
+				taskID,
+				time.Now().Format("2006-01-02 15:04:05"),
+			),
+		},
+	}
+
+	// 发送系统通知到所有配置的系统通知方式
+	for _, notifyConfig := range config.AppConfig.System.Notifications {
+		webhook := config.WebhookConfig{
+			URL:    notifyConfig.Type,
+			Secret: "",
+			Name:   notifyConfig.Name,
+		}
+
+		result := ps.platformManager.ForwardToSystem(webhook, systemReq)
+		task.Manager.AddResult(taskID, task.PushResult{
+			Platform:  result.Platform,
+			Webhook:   result.Webhook,
+			Status:    result.Status,
+			Message:   result.Message,
+			Timestamp: result.Timestamp,
+		})
+
+		logger.Infof("系统通知发送结果: %s-%s: %s", result.Platform, result.Webhook, result.Status)
+	}
 }

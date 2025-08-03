@@ -40,6 +40,7 @@ func NewPlatformManager() *PlatformManager {
 	manager.RegisterPlatform(NewDingtalkPlatform())
 	manager.RegisterPlatform(NewWechatPlatform())
 	manager.RegisterPlatform(NewEmailPlatform())
+	manager.RegisterPlatform(NewSystemPlatform())
 
 	return manager
 }
@@ -99,4 +100,9 @@ func (pm *PlatformManager) ForwardToWorkWechat(webhook config.WebhookConfig, req
 // ForwardToEmail 转发到邮件
 func (pm *PlatformManager) ForwardToEmail(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
 	return pm.Send("email", webhook, req)
+}
+
+// ForwardToSystem 转发到系统通知
+func (pm *PlatformManager) ForwardToSystem(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
+	return pm.Send("system", webhook, req)
 }

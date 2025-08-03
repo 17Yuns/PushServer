@@ -13,6 +13,7 @@ type Config struct {
 	Queue      QueueConfig                `mapstructure:"queue"`
 	Task       TaskConfig                 `mapstructure:"task"`
 	Email      EmailConfig                `mapstructure:"email"`
+	System     SystemConfig               `mapstructure:"system"`
 }
 
 // ServerConfig 服务器配置
@@ -41,9 +42,10 @@ type RecipientConfig struct {
 
 // PlatformConfig 推送平台配置
 type PlatformConfig struct {
-	Enabled    bool                   `mapstructure:"enabled"`
-	Webhooks   []WebhookConfig        `mapstructure:"webhooks"`
-	Recipients []EmailRecipientConfig `mapstructure:"recipients"`
+	Enabled       bool                       `mapstructure:"enabled"`
+	Webhooks      []WebhookConfig            `mapstructure:"webhooks"`
+	Recipients    []EmailRecipientConfig     `mapstructure:"recipients"`
+	Notifications []SystemNotificationConfig `mapstructure:"notifications"`
 }
 
 // WebhookConfig Webhook配置
@@ -76,11 +78,24 @@ type TaskConfig struct {
 
 // EmailConfig 邮件配置
 type EmailConfig struct {
-	SMTPHost string `mapstructure:"smtp_host"` // SMTP服务器地址
-	SMTPPort int    `mapstructure:"smtp_port"` // SMTP端口
-	Username string `mapstructure:"username"`  // SMTP用户名
-	Password string `mapstructure:"password"`  // SMTP密码
-	From     string `mapstructure:"from"`      // 发件人邮箱
+	SMTPHost string `mapstructure:"smtp_host"`
+	SMTPPort int    `mapstructure:"smtp_port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	From     string `mapstructure:"from"`
+}
+
+// SystemConfig 系统通知配置
+type SystemConfig struct {
+	Enabled       bool                       `mapstructure:"enabled"`
+	Notifications []SystemNotificationConfig `mapstructure:"notifications"`
+}
+
+// SystemNotificationConfig 系统通知方式配置
+type SystemNotificationConfig struct {
+	Type string `mapstructure:"type"`
+	Name string `mapstructure:"name"`
+	URL  string `mapstructure:"url"`
 }
 
 var AppConfig *Config
