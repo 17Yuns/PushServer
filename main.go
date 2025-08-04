@@ -6,6 +6,7 @@ import (
 
 	"PushServer/internal/config"
 	"PushServer/internal/logger"
+	"PushServer/internal/notification"
 	"PushServer/internal/queue"
 	"PushServer/internal/server"
 	"PushServer/internal/task"
@@ -36,6 +37,8 @@ func main() {
 	task.InitTaskManager(config.AppConfig.Task.CleanupInterval, config.AppConfig.Task.MaxAge)
 	logger.Info("任务管理器初始化完成")
 
+	// 初始化通知管理器
+	notification.InitNotificationManager(1000)
 	// 初始化队列
 	queue.InitQueue()
 	logger.Info("队列系统初始化完成")

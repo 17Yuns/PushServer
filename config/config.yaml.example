@@ -1,117 +1,112 @@
-# PushServer 配置文件示例
-# 复制此文件为 config.yaml 并修改相应配置
-
 # 服务配置
 server:
-  port: 8080                    # 服务端口
-  host: "0.0.0.0"              # 监听地址
-  mode: "debug"                # 运行模式: debug, release, test
+  port: 8080
+  host: "0.0.0.0"
+  mode: "debug" # debug, release, test
 
 # 日志配置
 log:
-  level: "info"                # 日志级别: debug, info, warn, error
-  format: "json"               # 日志格式: json, text
-  output: "file"               # 输出方式: stdout, file, both
-  file_path: "log/app.log"     # 日志文件路径
-
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "file" # stdout, file
+  file_path: "log/app.log"
+  error_file_path: "log/error.log"
+  info_file_path: "log/info.log"
+  debug_file_path: "log/debug.log"
 # 队列配置
 queue:
-  worker_count: 50             # 工作协程数量
-  buffer_size: 10000           # 队列缓冲区大小
-  timeout: 10                  # 推送超时时间(秒)
+  worker_count: 50 # 工作协程数量
+  buffer_size: 10000 # 队列缓冲区大小
+  timeout: 10 # 推送超时时间(秒)
+  max_concurrent_per_platform: 20 # 每个平台最大并发数
+  batch_size: 100 # 批处理大小
 
-# 任务管理配置
+# 任务状态配置
 task:
-  cleanup_interval: 300        # 清理间隔(秒)
-  retention_time: 3600         # 任务保留时间(秒)
+  cleanup_interval: 300 # 清理间隔(秒)，默认5分钟
+  max_age: 3600 # 任务最大保存时间(秒)，默认1小时
 
-# 接收者配置
+
+# 推送配置
 recipients:
-  # 运维告警组
   ops_alert:
     name: "运维告警组"
     platforms:
-      # 飞书配置
       feishu:
-        enabled: true
+        enabled: false
         webhooks:
-          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-            secret: "your-webhook-secret"
-            name: "主要告警群"
-          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/your-backup-webhook-token"
-            secret: "your-backup-webhook-secret"
-            name: "备用告警群"
-      
-      # 钉钉配置
+          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/"
+            secret: ""
+            name: "测试机器人01"
+          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/"
+            secret: ""
+            name: "测试机器人02"
       dingtalk:
         enabled: false
         webhooks:
-          - url: "https://oapi.dingtalk.com/robot/send?access_token=your-access-token"
-            secret: "your-webhook-secret"
-            name: "钉钉告警群"
-      
-      # 企业微信配置
+          - url: "https://oapi.dingtalk.com/robot/send?access_token="
+            secret: ""
+            name: "测试机器人01"
+          - url: "https://oapi.dingtalk.com/robot/send?access_token="
+            secret: ""
+            name: "测试机器人02"
       wechat:
         enabled: false
         webhooks:
-          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your-webhook-key"
+          - url: ""
             secret: ""
             name: "企业微信告警群"
+      email:
+        enabled: true
+        recipients:
+          - email: "admin@example.com"
+            name: "运维邮箱"
+          - email: "alert@example.com"
+            name: "告警邮箱"
+      system:
+        enabled: true
+        notifications:
+          - type: "console"
+            name: "控制台通知"
+          - type: "file"
+            name: "文件通知"
+          - type: "http"
+            name: "内部存储通知"
 
-  # 开发团队通知
-  dev_team:
-    name: "开发团队"
+  dev_notify:
+    name: "开发通知组"
     platforms:
       feishu:
         enabled: true
         webhooks:
-          - url: "https://open.feishu.cn/open-apis/bot/v2/hook/dev-team-webhook"
-            secret: "dev-team-secret"
-            name: "开发团队群"
-      
-      dingtalk:
-        enabled: true
-        webhooks:
-          - url: "https://oapi.dingtalk.com/robot/send?access_token=dev-team-token"
-            secret: "dev-team-dingtalk-secret"
-            name: "开发钉钉群"
-
-  # 产品团队通知
-  product_team:
-    name: "产品团队"
-    platforms:
-      wechat:
-        enabled: true
-        webhooks:
-          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=product-team-key"
+          - url: ""
             secret: ""
-            name: "产品团队群"
+            name: "开发群"
+      email:
+        enabled: false
+        webhooks:
+          - url: "dev@example.com"
+            secret: ""
+            name: "开发邮箱"
 
-# 平台全局配置（可选）
-platforms:
-  feishu:
-    enabled: true
-    timeout: 10
-    max_retries: 3
-  
-  dingtalk:
-    enabled: true
-    timeout: 10
-    max_retries: 3
-  
-  wechat:
-    enabled: true
-    timeout: 10
-    max_retries: 3
 
-# 数据库配置（预留，当前未使用）
-database:
-  enabled: false
-  driver: "mysql"
-  host: "localhost"
-  port: 3306
-  username: ""
-  password: ""
-  database: ""
-  max_open_conns: 100
-  max_idle_conns: 10
+# 邮件配置
+email:
+  # SMTP配置（直接发送邮件）
+  smtp_host: ""           # SMTP服务器地址，如: smtp.gmail.com
+  smtp_port: 587          # SMTP端口，通常587或465
+  username: ""            # SMTP用户名
+  password: ""            # SMTP密码或应用密码
+  from: ""               # 发件人邮箱
+
+# 全局系统通知配置（最后防线）
+system:
+  enabled: true
+  notifications:
+    - type: "console"
+      name: "控制台通知"
+    - type: "file"
+      name: "文件通知"
+    - type: "http"
+      name: "内部存储通知"
+

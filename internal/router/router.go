@@ -26,6 +26,18 @@ func SetupRouter() *gin.Engine {
 		
 		// 任务状态查询接口
 		api.GET("/task/:id", handler.GetTaskStatus)
+		
+		// 系统通知接口
+		notifications := api.Group("/notifications")
+		{
+			notifications.GET("", handler.GetSystemNotifications)           // 获取通知列表
+			notifications.GET("/:id", handler.GetSystemNotification)        // 获取单个通知
+			notifications.PUT("/:id/read", handler.MarkNotificationAsRead)  // 标记为已读
+			notifications.PUT("/read-all", handler.MarkAllNotificationsAsRead) // 标记所有为已读
+			notifications.DELETE("/:id", handler.DeleteSystemNotification)  // 删除通知
+			notifications.DELETE("", handler.ClearAllNotifications)         // 清空所有通知
+			notifications.GET("/statistics", handler.GetNotificationStatistics) // 获取统计信息
+		}
 	}
 
 	return r

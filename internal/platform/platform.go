@@ -87,12 +87,7 @@ func (pm *PlatformManager) ForwardToDingtalk(webhook config.WebhookConfig, req m
 	return pm.Send("dingtalk", webhook, req)
 }
 
-// ForwardToWechat 转发到企业微信
-func (pm *PlatformManager) ForwardToWechat(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
-	return pm.Send("wechat", webhook, req)
-}
-
-// ForwardToWorkWechat 转发到企业微信（别名方法）
+// ForwardToWorkWechat 转发到企业微信
 func (pm *PlatformManager) ForwardToWorkWechat(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
 	return pm.Send("wechat", webhook, req)
 }

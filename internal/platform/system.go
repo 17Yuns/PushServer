@@ -1,10 +1,7 @@
 package platform
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +10,7 @@ import (
 	"PushServer/internal/config"
 	"PushServer/internal/logger"
 	"PushServer/internal/model"
+	"PushServer/internal/notification"
 )
 
 // SystemPlatform 系统通知平台
@@ -138,76 +136,21 @@ func (s *SystemPlatform) sendToConsole(webhook config.WebhookConfig, req model.P
 	}
 }
 
-// sendToHTTP 发送HTTP通知
+// sendToHTTP 发送HTTP通知（存储到内部系统）
 func (s *SystemPlatform) sendToHTTP(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
-	// 从配置中获取HTTP URL
-	var httpURL string
-	for _, notifyConfig := range config.AppConfig.System.Notifications {
-		if notifyConfig.Type == "http" && notifyConfig.Name == webhook.Name {
-			httpURL = notifyConfig.URL
-			break
-		}
-	}
+	// 将通知存储到内部系统
+	reason := "系统通知存储"
+	taskID := "" // 从请求中获取任务ID，如果没有则为空
+	
+	notificationID := notification.Manager.AddNotification(taskID, req, reason)
 
-	if httpURL == "" {
-		return PlatformResult{
-			Platform:  "system",
-			Webhook:   webhook.Name,
-			Status:    "failed",
-			Message:   "HTTP通知URL未配置",
-			Timestamp: time.Now(),
-		}
-	}
-
-	// 构建HTTP请求数据
-	data := s.buildHTTPData(req)
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return PlatformResult{
-			Platform:  "system",
-			Webhook:   webhook.Name,
-			Status:    "failed",
-			Message:   "构建HTTP请求数据失败: " + err.Error(),
-			Timestamp: time.Now(),
-		}
-	}
-
-	// 发送HTTP请求
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	resp, err := client.Post(httpURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return PlatformResult{
-			Platform:  "system",
-			Webhook:   webhook.Name,
-			Status:    "failed",
-			Message:   "HTTP请求发送失败: " + err.Error(),
-			Timestamp: time.Now(),
-		}
-	}
-	defer resp.Body.Close()
-
-	// 检查响应状态
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		logger.Infof("系统通知发送成功: %s (HTTP: %s)", webhook.Name, httpURL)
-		return PlatformResult{
-			Platform:  "system",
-			Webhook:   webhook.Name,
-			Status:    "success",
-			Message:   fmt.Sprintf("HTTP通知发送成功，状态码: %d", resp.StatusCode),
-			Timestamp: time.Now(),
-		}
-	} else {
-		logger.Errorf("系统通知发送失败: %s (HTTP: %s, 状态码: %d)", webhook.Name, httpURL, resp.StatusCode)
-		return PlatformResult{
-			Platform:  "system",
-			Webhook:   webhook.Name,
-			Status:    "failed",
-			Message:   fmt.Sprintf("HTTP通知发送失败，状态码: %d", resp.StatusCode),
-			Timestamp: time.Now(),
-		}
+	logger.Infof("系统通知存储成功: %s (通知ID: %s)", webhook.Name, notificationID)
+	return PlatformResult{
+		Platform:  "system",
+		Webhook:   webhook.Name,
+		Status:    "success",
+		Message:   fmt.Sprintf("系统通知已存储，通知ID: %s", notificationID),
+		Timestamp: time.Now(),
 	}
 }
 
@@ -291,29 +234,6 @@ func (s *SystemPlatform) buildConsoleMessage(req model.PushRequest) string {
 	)
 }
 
-// HTTPNotificationData HTTP通知数据结构
-type HTTPNotificationData struct {
-	Title     string `json:"title"`
-	Message   string `json:"message"`
-	Type      string `json:"type"`
-	Strategy  string `json:"strategy"`
-	Style     string `json:"style"`
-	Timestamp string `json:"timestamp"`
-	Source    string `json:"source"`
-}
-
-// buildHTTPData 构建HTTP请求数据
-func (s *SystemPlatform) buildHTTPData(req model.PushRequest) HTTPNotificationData {
-	return HTTPNotificationData{
-		Title:     req.Content.Title,
-		Message:   req.Content.Msg,
-		Type:      req.Type,
-		Strategy:  req.Strategy,
-		Style:     req.Style,
-		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
-		Source:    "PushServer-SystemNotification",
-	}
-}
 
 // GetName 获取平台名称
 func (s *SystemPlatform) GetName() string {

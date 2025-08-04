@@ -235,19 +235,30 @@ system:
 #### 3. 系统日志 (syslog)
 写入到应用日志系统，根据消息类型选择日志级别，便于日志收集和监控。
 
-#### 4. HTTP通知 (http)
-发送POST请求到指定URL，JSON格式数据传输，支持外部系统集成。
+#### 4. 内部存储通知 (http)
+将通知存储到系统内部，用户可通过HTTP API接口查询和管理这些通知。
 
-**HTTP通知数据格式**：
+**内部存储通知特性**：
+- 🗄️ **内存存储**：通知存储在内存中，重启后清空
+- 🔍 **API查询**：提供完整的REST API进行通知管理
+- 📊 **状态管理**：支持已读/未读状态管理
+- 📈 **统计信息**：提供详细的通知统计数据
+- 🗑️ **批量操作**：支持批量标记已读、删除等操作
+
+**存储的通知数据格式**：
 ```json
 {
+  "id": "notify_20250804090748_666666",
   "title": "通知标题",
   "message": "通知内容",
   "type": "error|warning|info",
   "strategy": "all|failover|webhook_failover|mixed",
   "style": "text|card",
-  "timestamp": "2025-08-04 01:51:02",
-  "source": "PushServer-SystemNotification"
+  "source": "PushServer-SystemNotification",
+  "task_id": "关联的推送任务ID",
+  "reason": "通知产生原因",
+  "created_at": "2025-08-04T09:07:48Z",
+  "status": "unread|read"
 }
 ```
 
@@ -501,7 +512,108 @@ GET /api/v1/task/{task_id}
 | processing | 推送处理中 |
 | timeout | 推送超时 |
 
-### 6. 使用示例
+### 6. 系统通知管理接口
+
+#### 6.1 获取通知列表
+
+**接口描述**：获取系统通知列表，支持分页和状态筛选
+
+**请求信息**：
+- **URL**: `/api/v1/notifications`
+- **Method**: `GET`
+- **参数**:
+  - `status` (可选): 通知状态筛选 - `unread`, `read`, `all`
+  - `limit` (可选): 每页数量，默认50，最大1000
+  - `offset` (可选): 偏移量，默认0
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "message": "获取系统通知成功",
+  "data": {
+    "notifications": [
+      {
+        "id": "notify_20250804090748_666666",
+        "title": "系统通知最后防线测试",
+        "message": "测试当所有配置的推送渠道都失败时...",
+        "type": "warning",
+        "strategy": "all",
+        "style": "card",
+        "source": "PushServer-SystemNotification",
+        "task_id": "",
+        "reason": "系统通知存储",
+        "created_at": "2025-08-04T09:07:48Z",
+        "status": "unread"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "limit": 50,
+      "offset": 0,
+      "count": 1
+    }
+  }
+}
+```
+
+#### 6.2 获取单个通知
+
+**请求信息**：
+- **URL**: `/api/v1/notifications/{id}`
+- **Method**: `GET`
+
+#### 6.3 标记通知为已读
+
+**请求信息**：
+- **URL**: `/api/v1/notifications/{id}/read`
+- **Method**: `PUT`
+
+#### 6.4 标记所有通知为已读
+
+**请求信息**：
+- **URL**: `/api/v1/notifications/read-all`
+- **Method**: `PUT`
+
+#### 6.5 删除通知
+
+**请求信息**：
+- **URL**: `/api/v1/notifications/{id}`
+- **Method**: `DELETE`
+
+#### 6.6 清空所有通知
+
+**请求信息**：
+- **URL**: `/api/v1/notifications`
+- **Method**: `DELETE`
+
+#### 6.7 获取通知统计
+
+**请求信息**：
+- **URL**: `/api/v1/notifications/statistics`
+- **Method**: `GET`
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "message": "获取通知统计成功",
+  "data": {
+    "statistics": {
+      "total": 5,
+      "unread": 2,
+      "read": 3,
+      "by_type": {
+        "error": 2,
+        "warning": 2,
+        "info": 1
+      }
+    }
+  }
+}
+```
+
+### 7. 使用示例
 
 #### cURL示例
 ```bash
@@ -521,6 +633,18 @@ curl -X POST http://localhost:8080/api/v1/push \
 
 # 查询任务状态
 curl http://localhost:8080/api/v1/task/f029b7c4-e0a2-4a35-8fd0-247542bab4b6
+
+# 获取系统通知列表
+curl http://localhost:8080/api/v1/notifications
+
+# 获取未读通知
+curl "http://localhost:8080/api/v1/notifications?status=unread&limit=10"
+
+# 标记通知为已读
+curl -X PUT http://localhost:8080/api/v1/notifications/notify_20250804090748_666666/read
+
+# 获取通知统计
+curl http://localhost:8080/api/v1/notifications/statistics
 ```
 
 #### Python示例
@@ -551,6 +675,25 @@ def get_task_status(task_id):
     response = requests.get(url)
     return response.json()
 
+# 获取系统通知列表
+def get_notifications(status="all", limit=50, offset=0):
+    url = f"http://localhost:8080/api/v1/notifications"
+    params = {"status": status, "limit": limit, "offset": offset}
+    response = requests.get(url, params=params)
+    return response.json()
+
+# 标记通知为已读
+def mark_notification_read(notification_id):
+    url = f"http://localhost:8080/api/v1/notifications/{notification_id}/read"
+    response = requests.put(url)
+    return response.json()
+
+# 获取通知统计
+def get_notification_statistics():
+    url = "http://localhost:8080/api/v1/notifications/statistics"
+    response = requests.get(url)
+    return response.json()
+
 # 使用示例
 result = send_notification("系统通知", "服务部署完成")
 print(f"任务ID: {result['data']['task_id']}")
@@ -558,6 +701,14 @@ print(f"任务ID: {result['data']['task_id']}")
 # 查询状态
 status = get_task_status(result['data']['task_id'])
 print(f"任务状态: {status['data']['status']}")
+
+# 获取系统通知
+notifications = get_notifications(status="unread", limit=10)
+print(f"未读通知数量: {notifications['data']['pagination']['total']}")
+
+# 获取统计信息
+stats = get_notification_statistics()
+print(f"通知统计: {stats['data']['statistics']}")
 ```
 
 #### JavaScript示例
@@ -590,6 +741,27 @@ async function getTaskStatus(taskId) {
   return await response.json();
 }
 
+// 获取系统通知列表
+async function getNotifications(status = 'all', limit = 50, offset = 0) {
+  const params = new URLSearchParams({ status, limit, offset });
+  const response = await fetch(`http://localhost:8080/api/v1/notifications?${params}`);
+  return await response.json();
+}
+
+// 标记通知为已读
+async function markNotificationRead(notificationId) {
+  const response = await fetch(`http://localhost:8080/api/v1/notifications/${notificationId}/read`, {
+    method: 'PUT'
+  });
+  return await response.json();
+}
+
+// 获取通知统计
+async function getNotificationStatistics() {
+  const response = await fetch('http://localhost:8080/api/v1/notifications/statistics');
+  return await response.json();
+}
+
 // 使用示例
 sendNotification('部署通知', '应用版本v1.2.0部署成功')
   .then(result => {
@@ -598,6 +770,16 @@ sendNotification('部署通知', '应用版本v1.2.0部署成功')
   })
   .then(status => {
     console.log('任务状态:', status.data.status);
+    // 获取系统通知
+    return getNotifications('unread', 10);
+  })
+  .then(notifications => {
+    console.log('未读通知数量:', notifications.data.pagination.total);
+    // 获取统计信息
+    return getNotificationStatistics();
+  })
+  .then(stats => {
+    console.log('通知统计:', stats.data.statistics);
   });
 ```
 
@@ -623,14 +805,28 @@ sendNotification('部署通知', '应用版本v1.2.0部署成功')
 
 ## 🎯 路线图
 
+### 🚀 已完成功能
+- [x] 5大推送平台支持（飞书、钉钉、企业微信、邮件、系统通知）
+- [x] 4种智能推送策略
+- [x] 系统通知内部存储功能
+- [x] 完整的通知管理API
+- [x] 高并发队列处理
+- [x] 任务状态追踪
+- [x] 多种系统通知方式（控制台、文件、日志、内部存储）
+
+### 📋 计划中功能
 - [ ] 支持更多推送平台（Slack、Teams等）
 - [ ] Web管理界面
 - [ ] 消息模板管理
-- [ ] 推送统计和分析
+- [ ] 推送统计和分析仪表板
 - [ ] 消息去重机制
 - [ ] 定时推送功能
 - [ ] 消息优先级队列
 - [ ] 集群部署支持
+- [ ] 系统通知持久化存储（数据库）
+- [ ] 通知订阅和过滤功能
+- [ ] 推送失败重试策略优化
+- [ ] 消息加密传输
 
 ---
 

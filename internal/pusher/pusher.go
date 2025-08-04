@@ -425,7 +425,7 @@ func (ps *PushService) sendToWebhook(platformName string, webhook config.Webhook
 	case "dingtalk":
 		result = ps.platformManager.ForwardToDingtalk(webhook, req)
 	case "wechat":
-		result = ps.platformManager.ForwardToWechat(webhook, req)
+		result = ps.platformManager.ForwardToWorkWechat(webhook, req)
 	case "email":
 		result = ps.platformManager.ForwardToEmail(webhook, req)
 	case "system":
