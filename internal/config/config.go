@@ -9,10 +9,11 @@ import (
 type Config struct {
 	Server     ServerConfig               `mapstructure:"server"`
 	Log        LogConfig                  `mapstructure:"log"`
-	Recipients map[string]RecipientConfig `mapstructure:"recipients"`
 	Queue      QueueConfig                `mapstructure:"queue"`
 	Task       TaskConfig                 `mapstructure:"task"`
+	Recipients map[string]RecipientConfig `mapstructure:"recipients"`
 	Email      EmailConfig                `mapstructure:"email"`
+	SMTPRelay  SMTPRelayConfig            `mapstructure:"smtp_relay"`
 	System     SystemConfig               `mapstructure:"system"`
 }
 
@@ -83,6 +84,38 @@ type EmailConfig struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	From     string `mapstructure:"from"`
+}
+
+// SMTPRelayConfig SMTP中继配置
+type SMTPRelayConfig struct {
+	Enabled    bool                `mapstructure:"enabled"`
+	MaxRetries int                 `mapstructure:"max_retries"`
+	Server     SMTPServerConfig    `mapstructure:"server"`
+	Auth       SMTPAuthConfig      `mapstructure:"auth"`
+	Accounts   []SMTPAccountConfig `mapstructure:"accounts"`
+}
+
+// SMTPServerConfig SMTP服务器配置
+type SMTPServerConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+// SMTPAuthConfig SMTP认证配置
+type SMTPAuthConfig struct {
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+// SMTPAccountConfig SMTP账户配置
+type SMTPAccountConfig struct {
+	Name     string `mapstructure:"name"`
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	From     string `mapstructure:"from"`
+	Enabled  bool   `mapstructure:"enabled"`
 }
 
 // SystemConfig 系统通知配置

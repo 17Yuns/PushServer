@@ -51,11 +51,15 @@ recipients:
             secret: ""
             name: "测试机器人02"
       wechat:
-        enabled: false
+        enabled: true
         webhooks:
-          - url: ""
+          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key="
             secret: ""
-            name: "企业微信告警群"
+            name: "测试01"
+          - url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?ke"
+            secret: ""
+            name: "测试02"
+
       email:
         enabled: true
         recipients:
@@ -94,10 +98,35 @@ recipients:
 email:
   # SMTP配置（直接发送邮件）
   smtp_host: ""           # SMTP服务器地址，如: smtp.gmail.com
-  smtp_port: 587          # SMTP端口，通常587或465
+  smtp_port: 465          # SMTP端口，通常587或465
   username: ""            # SMTP用户名
   password: ""            # SMTP密码或应用密码
   from: ""               # 发件人邮箱
+
+# SMTP中继配置
+smtp_relay:
+  enabled: true           # 是否启用SMTP中继功能
+  max_retries: 3          # 最大重试次数，0表示尝试所有账户
+
+  # SMTP中继服务器配置（用户连接的服务器）
+  server:
+    host: "0.0.0.0"       # 中继服务器监听地址
+    port: 2525            # 中继服务器端口（避免与标准SMTP端口冲突）
+
+  # SMTP中继认证配置（用户连接时的认证信息）
+  auth:
+    username: "testuser"    # 用户连接中继服务器的用户名
+    password: "testpassword"    # 用户连接中继服务器的密码
+
+  accounts:               # 真实SMTP账户列表（用于转发）
+    - name: "测试账户1"
+      host: ""
+      port: 465
+      username: ""
+      password: ""
+      from: ""
+      enabled: true
+
 
 # 全局系统通知配置（最后防线）
 system:

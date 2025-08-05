@@ -8,6 +8,7 @@ import (
 	"PushServer/internal/config"
 	"PushServer/internal/logger"
 	"PushServer/internal/model"
+	smtpRelay "PushServer/internal/smtp"
 )
 
 // EmailPlatform 邮件平台
@@ -22,19 +23,61 @@ func NewEmailPlatform() *EmailPlatform {
 func (e *EmailPlatform) Send(webhook config.WebhookConfig, req model.PushRequest) PlatformResult {
 	logger.Infof("开始发送邮件: %s, 类型: %s, 样式: %s", webhook.Name, req.Type, req.Style)
 
-	// 检查是否配置了SMTP服务器
+	// 检查是否启用SMTP中继
+	relayService := smtpRelay.NewRelayService()
+	if relayService.IsEnabled() {
+		logger.Infof("使用SMTP中继发送邮件: %s", webhook.Name)
+		return e.sendViaRelay(webhook, req, relayService)
+	}
+
+	// 检查是否配置了直连SMTP服务器
 	if config.AppConfig.Email.SMTPHost == "" {
 		return PlatformResult{
 			Platform:  "email",
 			Webhook:   webhook.Name,
 			Status:    "failed",
-			Message:   "未配置SMTP服务器",
+			Message:   "未配置SMTP服务器且SMTP中继未启用",
 			Timestamp: time.Now(),
 		}
 	}
 
-	// 使用SMTP发送邮件
+	// 使用直连SMTP发送邮件
+	logger.Infof("使用直连SMTP发送邮件: %s", webhook.Name)
 	return e.sendViaSMTP(webhook, req)
+}
+
+// sendViaRelay 通过SMTP中继发送邮件
+func (e *EmailPlatform) sendViaRelay(webhook config.WebhookConfig, req model.PushRequest, relayService *smtpRelay.RelayService) PlatformResult {
+	result := PlatformResult{
+		Platform:  "email",
+		Webhook:   webhook.Name,
+		Timestamp: time.Now(),
+	}
+
+	// 构建邮件内容
+	subject, body := e.buildEmailContent(req)
+
+	// 构建邮件消息
+	emailMsg := smtpRelay.EmailMessage{
+		To:      []string{webhook.URL}, // 在邮件场景下，URL字段存储收件人邮箱
+		Subject: subject,
+		Body:    body,
+		IsHTML:  true,
+	}
+
+	// 通过中继发送邮件
+	err := relayService.SendEmail(emailMsg)
+	if err != nil {
+		result.Status = "failed"
+		result.Message = fmt.Sprintf("SMTP中继发送失败: %v", err)
+		logger.Errorf("SMTP中继邮件发送失败: %s, 错误: %v", webhook.Name, err)
+	} else {
+		result.Status = "success"
+		result.Message = "SMTP中继邮件发送成功"
+		logger.Infof("SMTP中继邮件发送成功: %s", webhook.Name)
+	}
+
+	return result
 }
 
 // sendViaSMTP 通过SMTP发送邮件

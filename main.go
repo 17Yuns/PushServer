@@ -9,6 +9,7 @@ import (
 	"PushServer/internal/notification"
 	"PushServer/internal/queue"
 	"PushServer/internal/server"
+	"PushServer/internal/smtp"
 	"PushServer/internal/task"
 )
 
@@ -39,17 +40,26 @@ func main() {
 
 	// 初始化通知管理器
 	notification.InitNotificationManager(1000)
+	logger.Info("通知管理器初始化完成")
+
 	// 初始化队列
 	queue.InitQueue()
 	logger.Info("队列系统初始化完成")
 
-	// 启动服务器
+	// 启动SMTP中继服务器
+	smtpServer := smtp.NewSMTPServer()
+	if err := smtpServer.Start(); err != nil {
+		logger.Errorf("SMTP中继服务器启动失败: %v", err)
+	}
+
+	// 启动HTTP服务器
 	srv := server.NewServer()
 	if err := srv.Start(); err != nil {
-		logger.Errorf("服务器启动失败: %v", err)
+		logger.Errorf("HTTP服务器启动失败: %v", err)
 	}
 
 	// 优雅关闭
 	queue.PushQueue.Stop()
 	task.Manager.Stop()
+	smtpServer.Stop()
 }
